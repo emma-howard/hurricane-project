@@ -26,13 +26,15 @@ class storm(object):
     self.pres = pres 
 
 # This function sorts imported data into storms :) 
-def stormify(dataset, storm_list): 
-  stormno = -1
-  name = 'empty' 
-  sid = 1900200
+def stormify(dataset):
+  storm_list = []
+  item = dataset[0] 
+  stormno = item[2]
+  name = item[5] 
+  sid = str(item[1]*1000 + item[2])
   lat = []
   longi = []
-  basin = 'xx'
+  basin = item[3]
   times = []
   wind = []
   pres = []
@@ -50,16 +52,16 @@ def stormify(dataset, storm_list):
       print('Pres', pres) """
       # Create an object for the given SID 
       storm_list.append(storm(name, sid, lat, longi, basin, times, wind, pres))
-      # Reset Values 
+      # Reset Values with new data
       stormno = item[2]
       name = item[5] 
       sid = str(item[1]*1000 + item[2])
-      lat = []
-      longi = []
+      lat = [item[8]]
+      longi = [item[9]]
       basin = item[3]
-      times = []
-      wind = []
-      pres = []
+      times = [item[6]]
+      wind = [item[10]]
+      pres = [item[11]]
     # Case 2 - Same old storm 
     else:
       lat.append(item[8])
@@ -68,6 +70,10 @@ def stormify(dataset, storm_list):
       wind.append(item[10])
       pres.append(item[11])
 
+  return storm_list
+
 test_set = dataset_1980p
+print(len(test_set))
 test_list = []
-stormify(test_set, test_list)    
+test_list = stormify(test_set)
+print(test_list[-1].lat)   
