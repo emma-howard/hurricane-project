@@ -1,7 +1,9 @@
 import tensorflow as tf
 import numpy as np
 import pandas as pd
-import folium 
+import folium
+import datetime as dt
+import dateutil.parser
 tf.__version__
 
 #------------------------------------------------------------------------------#
@@ -22,7 +24,43 @@ class storm(object):
     self.sub_basin = sub_basin
     self.times = times #Hurricane times 
     self.wind = wind 
-    self.pres = pres 
+    self.pres = pres
+
+  def Get_Maxs(this):
+    maxLat = max(this.lat)
+    maxLong = max(this.longi)
+    maxWind = max(this.wind)
+    maxPres = max(this.pres)
+    return maxLat, maxLong, maxWind, maxPres
+
+  def Get_Mins(this):
+    minLat = min(this.lat)
+    minLong = min(this.longi)
+    minWind = min(this.wind)
+    minPres = min(this.pres)
+    return minLat, minLong, minWind, minPres
+
+
+  def CleanStorm(this,interval):
+    toRemove = []
+    i = 1
+    lastCleanTime = this.times[0]
+    while(i < len(this.times)):
+      nextTime = this.times[i]
+      tDelta = nextTime - lastCleanTime
+      if tDelta == interval:
+        lastCleanTime = nextTime
+      else:
+        toRemove.append(i)
+      i += 1
+
+    toRemove.sort(reverse=True)
+    for r in toRemove:
+      this.times.pop(r)
+      this.longi.pop(r)
+      this.lat.pop(r)
+      this.wind.pop(r)
+      this.pres.pop(r)      
 
 # This function sorts imported data into storms :) 
 def stormify(dataset):
@@ -36,7 +74,6 @@ def stormify(dataset):
   longi = []
   basin = str.strip(item[3])
   sub_basin = str.strip(item[4])
-  print(sub_basin)
   times = []
   wind = []
   pres = []
@@ -62,18 +99,61 @@ def stormify(dataset):
       longi = [item[9]]
       basin = str.strip(item[3])
       sub_basin = str.strip(item[4])
-      times = [item[6]]
+      times = [dateutil.parser.parse(item[6])]
       wind = [item[10]]
       pres = [item[11]]
     # Case 2 - Same old storm 
     else:
       lat.append(item[8])
       longi.append(item[9])
-      times.append(item[6])
+      times.append(dateutil.parser.parse(item[6]))
       wind.append(item[10])
       pres.append(item[11])
 
   return storm_list
+
+def normalize(x, mx, mn):
+  return (x-mn)/(mx-mn)
+
+def normalize_col(col,maxV,minV):
+  for i in range(len(col)):
+    col[i] = normalize(col[i],maxV,minV)
+  return col
+
+def normalize_storms(storms):
+  maxLats = []
+  maxLongs = []
+  maxWinds = []
+  maxPress = []
+
+  minLats = []
+  minLongs = []
+  minWinds = []
+  minPress = []
+
+  for s in storms:
+    maLa , maLo , maWi, maPr = s.Get_Maxs()
+    maxLats.append(maLa)
+    maxLongs.append(maLo)
+    maxWinds.append(maWi)
+    maxPress.append(maPr)
+
+    miLa, miLo, miWi, miPr = s.Get_Mins()
+    minLats.append(miLa)
+    minLongs.append(miLo)
+    minWinds.append(miWi)
+    minPress.append(miPr)
+
+  maxs = [max(maxLats),max(maxLongs),max(maxWinds),max(maxPress)]
+  mins = [min(minLats),min(minLongs),min(minWinds),min(minPress)]
+
+  for s in storms:
+    s.lat = normalize_col(s.lat,maxs[0],mins[0])
+    s.longi = normalize_col(s.longi,maxs[1],mins[1])
+    s.wind = normalize_col(s.wind,maxs[2],mins[2])
+    s.pres = normalize_col(s.pres,maxs[3],mins[3])
+
+  return storms, maxs, mins
 
 def remove_small_storms(storm_list,cutoff):
   refined_storms = []
@@ -128,24 +208,6 @@ def create_organised_data(storm_list, stormSize):
 
   return data_x, data_y
 
-def normalize(x, mx, mn):
-  return (x-mn)/(mx-mn)
-
-def normCols(data, cols):
-  dataT =  np.array(data).T.tolist()
-  mins = []
-  maxs = []
-  for index in cols:
-    minV = min(dataT[index])
-    maxV = max(dataT[index])
-    
-    mins.append(minV)
-    maxs.append(maxV)
-
-    for i in range(len(dataT[index])):
-      dataT[index][i] = normalize(dataT[index][i],maxV,minV)
-  data = np.array(dataT).T.tolist()
-  return data, mins , maxs
 #------------------------------------------------------------------------------#
 
 #------------------------------------------------------------------------------#
@@ -174,7 +236,6 @@ def main():
   url = 'https://raw.githubusercontent.com/emma-howard/hurricane-project/master/Dataset/Allstorms.ibtracs_wmo.v03r10.csv'
   cols = ['sid','year','num','basin','sub_basin','name','time','Nature','lat','long','wind','pres', "center","wind %", "pres %","Center"]
   df = pd.read_csv(url, skiprows= 1, header=1)
-  print(df.head())
   # Coulumns - 
   # Who knows | year | num in year | basin | sub_basin | name | yy-mm-dd time | Nature | lat | long | wind (wmo) | pres (wmo) | center
 
@@ -188,31 +249,20 @@ def main():
   dataset_1980p = df.loc[df["Year"] >= min_year]
 
   raw_data = dataset_1980p.values
-  
-  colsToNorm = [8,9,10,11]
-  raw_data, mins, maxs = normCols(raw_data,colsToNorm)
-  print(maxs)
-  print(mins)
 
   sorted_storms = stormify(raw_data)
 
+  interval = dt.timedelta(hours=6)
+  for s in sorted_storms:
+    s.CleanStorm(interval)
+  
   storm_size = 5 # 4 previous time intervals, 1 for next iterval 
   sorted_storms = remove_small_storms(sorted_storms,storm_size)
-  B = []
-  SB = []
-  for s in sorted_storms:
-    b = s.basin
-    sb = s.sub_basin
 
-    if b not in B:
-      B.append(b)
-    if sb not in SB: 
-      SB.append(sb)
-    
-  print(B)
-  print(SB)
-
+  sorted_storms, maxs, mins = normalize_storms(sorted_storms)
+  
   data_x, data_y = create_organised_data(sorted_storms,storm_size)
+  
   print(data_x[-1])
   print(data_y[-1])
   print("---")
