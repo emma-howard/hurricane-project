@@ -83,13 +83,13 @@ def remove_small_storms(storm_list,cutoff):
   return refined_storms 
 
 def get_orgnaised_storm(storm,size):
-  basin_codes = ["","SE","SI","SP","EP","WP","NA","NI","SA"]
-  sub_basin_codes = ["","MM","WA","EA","CP","NA","GM","CS","BB","AS"]
+  #basin_codes = ["","SE","SI","SP","EP","WP","NA","NI","SA"]
+  #sub_basin_codes = ["","MM","WA","EA","CP","NA","GM","CS","BB","AS"]
   datas = []
   labels = []
 
-  basin = basin_codes.index(storm.basin)
-  sub_basin = sub_basin_codes.index(storm.sub_basin)
+  #basin = basin_codes.index(storm.basin)
+  #sub_basin = sub_basin_codes.index(storm.sub_basin)
 
   lats = storm.lat
   longs = storm.longi
@@ -99,7 +99,7 @@ def get_orgnaised_storm(storm,size):
   
   length = len(winds)
   for i in range((length+1)-size):
-    new_data = [basin,sub_basin]
+    new_data = []
     for j in range(size-1):
       index = j + i
 
@@ -128,12 +128,40 @@ def create_organised_data(storm_list, stormSize):
 
   return data_x, data_y
 
+def normalize(x, mx, mn):
+  return (x-mn)/(mx-mn)
 
+def normCols(data, cols):
+  dataT =  np.array(data).T.tolist()
+  mins = []
+  maxs = []
+  for index in cols:
+    minV = min(dataT[index])
+    maxV = max(dataT[index])
+    
+    mins.append(minV)
+    maxs.append(maxV)
+
+    for i in range(len(dataT[index])):
+      dataT[index][i] = normalize(dataT[index][i],maxV,minV)
+  data = np.array(dataT).T.tolist()
+  return data, mins , maxs
 #------------------------------------------------------------------------------#
 
 #------------------------------------------------------------------------------#
 #                                   Model                                      #
 
+class model():
+  def __init__(self, maxs, mins):
+    self.maxs = maxs
+    self.mins = mins 
+
+  def unNormalize(self,data):
+    orig = []
+    for d, maxV, minV in zip(data,self.maxs,self.mins):
+      o = d * (maxV - minV) + minV
+      orig.append(o)
+    return orig
 #------------------------------------------------------------------------------#
 
 #------------------------------------------------------------------------------#
@@ -144,14 +172,28 @@ def create_organised_data(storm_list, stormSize):
 def main():
   # Import the raw IBtracs hurricane data stored on GitHub
   url = 'https://raw.githubusercontent.com/emma-howard/hurricane-project/master/Dataset/Allstorms.ibtracs_wmo.v03r10.csv'
-  cols = ['sid','year','num','basin','sub_basin','name','time','Nature','lat','long','wind','pres', "center"]
-  df = pd.read_csv(url, skiprows= 2)
+  cols = ['sid','year','num','basin','sub_basin','name','time','Nature','lat','long','wind','pres', "center","wind %", "pres %","Center"]
+  df = pd.read_csv(url, skiprows= 1, header=1)
   print(df.head())
   # Coulumns - 
   # Who knows | year | num in year | basin | sub_basin | name | yy-mm-dd time | Nature | lat | long | wind (wmo) | pres (wmo) | center
+
+  basin = "NA"
+  df["BB"] = df["BB"].apply(str.strip)
+  df = df.loc[df["BB"] == basin] # get only NA basin
+  df = df.loc[df["kt"] > 0] # Remove remove invalid data
+  df = df.loc[df["mb"] > 0] # Remove remove invalid data
+
   min_year = 1980
   dataset_1980p = df.loc[df["Year"] >= min_year]
+
   raw_data = dataset_1980p.values
+  
+  colsToNorm = [8,9,10,11]
+  raw_data, mins, maxs = normCols(raw_data,colsToNorm)
+  print(maxs)
+  print(mins)
+
   sorted_storms = stormify(raw_data)
 
   storm_size = 5 # 4 previous time intervals, 1 for next iterval 
