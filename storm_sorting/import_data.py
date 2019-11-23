@@ -45,6 +45,7 @@ class storm(object):
     toRemove = []
     i = 1
     lastCleanTime = this.times[0]
+    # check if the last correct time minus the current time is in the correct interval
     while(i < len(this.times)):
       nextTime = this.times[i]
       tDelta = nextTime - lastCleanTime
@@ -54,7 +55,10 @@ class storm(object):
         toRemove.append(i)
       i += 1
 
+    # reverse sort to not mess up the indices 
     toRemove.sort(reverse=True)
+
+    # Remove the bad data
     for r in toRemove:
       this.times.pop(r)
       this.longi.pop(r)
@@ -166,7 +170,10 @@ def get_orgnaised_storm(storm,size):
   #basin_codes = ["","SE","SI","SP","EP","WP","NA","NI","SA"]
   #sub_basin_codes = ["","MM","WA","EA","CP","NA","GM","CS","BB","AS"]
   datas = []
-  labels = []
+  labels_lat = []
+  labels_long = []
+  labels_wind = []
+  labels_pres = []
 
   #basin = basin_codes.index(storm.basin)
   #sub_basin = sub_basin_codes.index(storm.sub_basin)
@@ -190,23 +197,31 @@ def get_orgnaised_storm(storm,size):
       new_data.append(press[index])
 
     label_index = i + size - 1 
-    label = [lats[label_index],longs[label_index]]
 
     datas.append(new_data)
-    labels.append(label)
+    labels_lat.append(lats[label_index])
+    labels_long.append(longs[label_index])
+    labels_wind.append(winds[label_index])
+    labels_pres.append(press[label_index])
 
-  return datas, labels
+  return datas, labels_lat, labels_long, labels_wind, labels_pres
 
 def create_organised_data(storm_list, stormSize):
-  data_x = [] # basin_code|sub_basin_code|lat_t0|long_t0|wnd_t0|pres_t0|lat_t1|long_t1|wnd_t1|pres_t1|...
-  data_y = [] # lat at next interval | long at next interval
+  data_x      = [] # lat_t0|long_t0|wnd_t0|pres_t0|lat_t1|long_t1|wnd_t1|pres_t1|...
+  data_y_lat  = [] # lat at next interval 
+  data_y_long = []
+  data_y_wind = []
+  data_y_pres = []
 
   for storm in storm_list:
-    x, y = get_orgnaised_storm(storm,stormSize)
+    x, yLat, yLong, yWind, yPres = get_orgnaised_storm(storm,stormSize)
     data_x = data_x + x
-    data_y = data_y + y
+    data_y_lat = data_y_lat + yLat
+    data_y_long = data_y_long + yLong
+    data_y_wind = data_y_wind + yWind
+    data_y_pres = data_y_pres + yPres
 
-  return data_x, data_y
+  return data_x, data_y_lat, data_y_long, data_y_wind, data_y_pres
 
 #------------------------------------------------------------------------------#
 
@@ -261,12 +276,17 @@ def main():
 
   sorted_storms, maxs, mins = normalize_storms(sorted_storms)
   
-  data_x, data_y = create_organised_data(sorted_storms,storm_size)
-  
-  print(data_x[-1])
-  print(data_y[-1])
+  data_x, data_y_lat, data_y_long, data_y_wind, data_y_pres = create_organised_data(sorted_storms,storm_size)
+  print(len(sorted_storms))
+  print(len(data_x))
+  print(data_x[0])
+  print(data_y_lat[0])
+  print(data_y_long[0])
+  print(data_y_wind[0])
+  print(data_y_pres[0])
   print("---")
-  print(sorted_storms[-1].lat)
-  print(sorted_storms[-1].longi)
+  print(sorted_storms[0].lat[4])
+  print(sorted_storms[0].longi[4])
+  print(sorted_storms[0].wind[4])
+  print(sorted_storms[0].pres[4])
   
-main()
